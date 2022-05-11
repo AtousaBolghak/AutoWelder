@@ -1,6 +1,6 @@
 
 /*
-  Automatic Welder - one revolution
+  Automatic Welder
 
   Created 4 April. 2022
 
@@ -18,6 +18,8 @@ const int redLed = 5;
 const int buttonPin = 2;
 const int servoPin = 12;
 const int buzzer = 3; //buzzer to arduino pin 3
+const int stopPin = 13;
+const int maxSteps = 16;
 volatile int state = LOW;
 int servoPos = 0; // variable to store the servo position
 
@@ -30,12 +32,18 @@ Servo myservo;
 
 // initialize the stepper library on pins 8 through 11:
 Stepper myStepper(stepsPerRevolution, 8, 9, 10, 11);
+Stepper lateralStepper(stepsPerRevolution, 4, 5, 6, 7);
 
 void setup() {
-  // set the speed at 60 rpm:
+  // Serial.begin(9600); // DEBUG: Will not work while interrupt is enabled
+  
+  // set the rotation speed at 60 rpm:
   myStepper.setSpeed(60);
+  // set the lateral speed at 100 rpm:
+  lateralStepper.setSpeed(100);
 
   pinMode(buttonPin, INPUT_PULLUP);
+  pinMode(stopPin, INPUT);
   attachInterrupt(digitalPinToInterrupt(buttonPin), toggle, LOW);
   pinMode(buzzer, OUTPUT); // Set buzzer
   pinMode(redLed, OUTPUT);
@@ -44,9 +52,23 @@ void setup() {
   myservo.attach(servoPin);  // attaches the servo on pin 9 to the servo object
   myservo.write(0);
 
-//  Serial.begin(9600); // DEBUG: Will not work while interrupt is enabled
+  // Lateral movement:
+  // Turn counterclockwise (backwards) until back switch is triggered
+  delay(1000);
+  while(digitalRead(stopPin)){
+     // Serial.println("counterclockwise");   // DEBUG
+     lateralStepper.step(-stepsPerRevolution);
+   }
+   delay(500);
+
+   // Turn clockwise (forwards) to set the welder
+   for(int i=0; i<maxSteps; i++){
+    // Serial.println("clockwise");   // DEBUG
+    lateralStepper.step(stepsPerRevolution);
+  }
 }
 
+int stopVal = 0;
 void loop() {
   digitalWrite(greenLed, HIGH);
 
@@ -78,6 +100,19 @@ void loop() {
     state = LOW;
     digitalWrite(redLed, state);
     weld_count = 0;
+
+    delay(500);
+    for (int i=0; i<3; i++){
+      tone(buzzer, 1200); // Send 1.2KHz sound signal...
+      delay(250);        
+      noTone(buzzer);     // Stop sound...
+      delay(250);
+    }
+    
+   // Move welder backwards
+    while(digitalRead(stopPin)){
+      lateralStepper.step(-stepsPerRevolution);
+    }
   }
 }
 
